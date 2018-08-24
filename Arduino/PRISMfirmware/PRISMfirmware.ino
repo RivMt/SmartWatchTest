@@ -162,6 +162,7 @@ void loop() {
     }
   }//while END
 
+  Serial.println(mReceivedMessage);
   //문자열 받아오기 flag false
   mIsReceivingBegin = false;
   
