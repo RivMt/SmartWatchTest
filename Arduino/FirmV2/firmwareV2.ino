@@ -29,9 +29,10 @@ char mMessageTitle[MESSAGE_SIZE] = "\0";
 short mMessageType = -1;
 bool mIsReceivingBegan = false;
 
-//Message Type
-const short ICON_TYPE_DATE = 0;
-const short ICON_TYPE_TIME = 1;
+//Message Data Type
+const short DATA_TYPE_SYNC = 0;
+
+//Message Icon Type
 const short ICON_TYPE_CALL = 2;
 const short ICON_TYPE_SMS = 3;
 const short ICON_TYPE_OTHER = 4;
@@ -45,23 +46,17 @@ const short ICON_TYPE_CALENDAR = 11;
 
 //Time
 bool mTime24 = false; //24시간 단위계
-bool mTimeReceived = false;
 short mTimeForm = 0;//시간 표시 스타일
-short mTimeHour = 0;
-short mTImeMinute = 30;
-short mTimeSecond = 0;
 short mTimeNextCheckHour = 0;
 short mTimeNextCheckMinute = 0;
 const short TIME_NEXT_CHECK_COUNT = 30;
 
 //Date
-bool mDateReceived = false;
 short mDateForm = 0;//날짜 표시 스타일
-short mDateYear = 1970;
-short mDateMonth = 1;
-short mDateDate = 1;
 
 //XBM Icon BEGIN
+const short mIconWidth = 18;
+const short mIconHeight = 8;
 static unsigned char IconConnected_bits[] = {
    0x00, 0x00, 0x00, 0x00, 0x08, 0x00, 0x00, 0x08, 0x00, 0x00, 0x0a, 0x00,
    0x00, 0x0a, 0x00, 0x80, 0x0a, 0x00, 0x80, 0x0a, 0x00, 0xa0, 0x0a, 0x00 };
@@ -177,9 +172,9 @@ void loop() {
     short type = findMessageType(received_message);
     if (type == ICON_TYPE_DATE) {
 
-    } else if (type == ICON_TYPE_TIME) {
-
-    } else if (type >= 0) {
+    } else if (type == DATA_TYPE_SYNC) {
+        setSync();
+    } else if (type > 0) {
         mMessageType = type;
     } else if (type == -1) {
         mMessageDesc = received_message;
@@ -195,11 +190,15 @@ void loop() {
             //When device has not been connected, do not show watch face
             if (mBluetoothConnected) {
                 //Draw Icon
-
+                u8g.drawXBM(2,2,mIconWidth, mIconHeight, getMessageIcon(mMessageType));
+                //Reset Font
+                u8g.setFont(u8g_font_unifont);
                 //Draw Title
-
+                u8g.setPrintPos(2+mIconWidth, 2);
+                u8g.print(mMessageTitle);
                 //Draw Description
-
+                u8g.setPrintPos(2, 6+mIconHeight);
+                u8g.print(mMessageDesc);
             }
         } else {
             //When status is bigger than max, complete animation
@@ -240,7 +239,9 @@ short findMessageType(char str[MESSAGE_SIZE]) {
             case 'W':
                 return ICON_TYPE_DOWNLOAD;
             case 'L':
-                return ICON_TYPE_CALENDAR;     
+                return ICON_TYPE_CALENDAR;  
+            case 'Y':
+                return DATA_TYPE_SYNC;       
             case '&':
                 return -2;//Title
         }
@@ -248,21 +249,27 @@ short findMessageType(char str[MESSAGE_SIZE]) {
     return -1;//Desc
 }
 
-void setDate(char str[MESSAGE_SIZE]) {
-    //Save Date
-    mDateYear = (str[2]-'0')*10+(str[3]-'0');
-    mDateMonth = (str[4]-'0')*10+(str[5]-'0');
-    mDateDate = (str[6]-'0')*10+(str[7]-'0');
-
-    //Check Date Received
-    mDateReceived = true;
+unsigned char getMessageIcon(short type) {
+    switch(type) {
+        case ICON_TYPE_CALL:
+            return IconCall_bits;
+    }
 }
 
-void setTime(char str[MESSAGE_SIZE]) {
+void setSync(char str[MESSAGE_SIZE]) {
+    //Var
+    int date_year, date_month, date_day,
+        time_hour, time_minute, time_second;
+
+    //Save Date
+    date_year = (str[3]-'0')*10+(str[4]-'0');
+    date_month = (str[5]-'0')*10+(str[6]-'0');
+    date_day = (str[7]-'0')*10+(str[8]-'0');
+
     //Save Time
-    mTimeHour = (str[3]-'0')*10+(str[4]-'0'); 
-    mTImeMinute = (str[5]-'0')*10+(str[6]-'0');
-    mTimeSecond = (str[7]-'0')*10+(str[8]-'0');
+    time_hour = (str[9]-'0')*10+(str[10]-'0'); 
+    time_minute = (str[11]-'0')*10+(str[12]-'0');
+    time_second = (str[13]-'0')*10+(str[14]-'0');
 
     //Set Time Form
     switch(str[2]) {
@@ -274,17 +281,11 @@ void setTime(char str[MESSAGE_SIZE]) {
             break;
     }
 
-    //Check Time Received
-    mTimeReceived = true;
-}
-
-void setRTC() {
-    if (mTimeReceived && mDateReceived) {
-        rtc.stopRTC();
-        rtc.setTime(mTimeHour, mTmeMinute, mTimeSecond);//hhmmss
-        rtc.setDate(mDateDate, mDateMonth, mDateYear);//ddMMyy
-        rtc.startRTC();
-    }
+    //Set RTC and Start RTC
+    rtc.stopRTC();
+    rtc.setTime(time_hour, time_minute, time_second);//hhmmss
+    rtc.setDate(date_day, date_month, date_year);//ddMMyy
+    rtc.startRTC();
 }
 
 String getDate() {
